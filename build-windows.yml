@@ -1,0 +1,37 @@
+name: Build OCEANA Windows installer
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Python for build only
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+      - name: Build self-contained OCEANA executable
+        run: python -m PyInstaller --noconfirm --clean OCEANA.spec
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - name: Build one-file installer
+        shell: pwsh
+        run: |
+          $iscc = Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+          & $iscc installer.iss
+          if ($LASTEXITCODE -ne 0) { throw 'Inno Setup failed' }
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: OCEANA-Windows-Installer
+          path: dist/OCEANA-Setup.exe
+          if-no-files-found: error
